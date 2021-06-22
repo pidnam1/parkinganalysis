@@ -4,16 +4,30 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import requests
 import json
+import os
 import config
 import csv
-def maps_call():
+
+
+def main():
+    ###File path names
+    directory = "parking"
+    csv_name = "parkingdata"
+
+    ##Request
     API_KEY = config.api_key
-    response = requests.get("https://maps.googleapis.com/maps/api/place/textsearch/json?query=Los+Angeles+garage&key=" + API_KEY)
-    ##response = requests.get("https://maps.lacity.org/lahub/rest/services/LADOT/MapServer/2/query?where=1%3D1&outFields=*&outSR=4326&f=json")
+    response = requests.get("https://maps.googleapis.com/maps/api/place/textsearch/json?query=Los+Angeles&type=parking&key=" + API_KEY)
     results = response.json()
     results = results["results"]
 
-    data_file = open('datagarage.csv', 'w', newline='')
+    ##Create directory
+    path = os.getcwd()
+    path = path + "\\" + directory
+    os.makedirs(path)
+    print(path)
+
+    ##Write csv
+    data_file = open(os.path.join(path,csv_name + ".csv"), 'w', newline='')
     csv_writer = csv.writer(data_file)
     count = 0
     photos = []
@@ -28,6 +42,8 @@ def maps_call():
                              , i["name"], i["types"]])
 
         print(i)
+
+        ##Store photo info
         try:
             photos.append(i["photos"][0]["photo_reference"])
             tracker.append(i["formatted_address"])
@@ -35,16 +51,17 @@ def maps_call():
             pass
     data_file.close()
 
-
+    ## Get photos
     for i in range(0, len(photos)):
         photo = requests.get("https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" + photos[i] + "&key=" + API_KEY)
 
-        file = open( str(tracker[i])+ ".jpg", "wb")
+        filename =  str(tracker[i])+ ".jpg"
+        file = open(os.path.join(path, filename), "wb")
         file.write(photo.content)
         file.close()
 
-    # Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    maps_call()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == '__main__':
+    main()
+
+
