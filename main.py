@@ -17,7 +17,10 @@ import sys
 import time
 import logging
 
-
+'''
+Finds parking garages in Los Angeles and places that info in Excel file
+Also fetches relevant pictures of the found garages
+'''
 def main():
     ###File path names
     directory = "parkingtry"
@@ -71,7 +74,10 @@ def main():
         file.write(photo.content)
         file.close()
 
-
+'''
+Gets elevation and relevant photos from existing list of addresses
+Creates new excel file with elevation info and downloads photos
+'''
 def elevationData():
     ##name files
     directory = "elevation"
@@ -162,7 +168,10 @@ def elevationData():
                 [i[0], i[1], i[2]
                     , i[3], i[5], i[4]])
 
-
+'''
+Definition of Address class used in webscraper
+Makes code easier to read and debug
+'''
 class Address:
     def __init__(self, address, lat, long, name):
         self.address = address
@@ -170,13 +179,17 @@ class Address:
         self.long = long
         self.name = name
 
-
+'''
+Creates excel file with related images from addresses searched on google maps
+Also downloads the images
+ '''
 def webtry():
     csv_name = "pictry"
 
     ##create directory
     path = os.getcwd()
 
+    ##put all Address objects in array
     addresses = []
     with open('citydata.csv') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -191,7 +204,11 @@ def webtry():
                 addresses.append(addy)
     data_file = open(os.path.join(path, csv_name + ".csv"), 'w', newline='')
     csv_writer = csv.writer(data_file)
+
+    ##write header
     csv_writer.writerow(["Address", "Lat", "Long", "Name", "Pic"])
+
+    ##open google maps and write first address, search
     chrome_options = Options()
     maps = webdriver.Chrome(options=chrome_options)
     maps.maximize_window()
@@ -201,9 +218,13 @@ def webtry():
     button = maps.find_element_by_id("searchbox-searchbutton")
     button.click()
     time.sleep(5)
+
+    ##grab pic webelement and download from link
     pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
     src = pic.get_attribute('src')
     urllib.request.urlretrieve(src, addresses[0].address + ".png")
+
+    ##loop through rest of address objects
     for i in range(1, len(addresses)):
         search_bar.send_keys(Keys.CONTROL, 'a')
         search_bar.send_keys(Keys.BACKSPACE)
@@ -211,6 +232,8 @@ def webtry():
         search_bar.send_keys(addresses[i].address)
         button.click()
         time.sleep(2.5)
+
+        ## if no pic, still add other info in except block
         try:
             pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
             src = pic.get_attribute('src')
@@ -221,10 +244,14 @@ def webtry():
         except:
             csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name])
             pass
+
+    ##Close everything
     data_file.close()
     maps.close()
 
-
+'''
+Test to see how elevation works in Google Maps
+'''
 def tallestBuilding():
     API_KEY = config.elevation_api_key
     response = requests.get(
