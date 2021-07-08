@@ -17,6 +17,7 @@ import sys
 import time
 import logging
 
+
 def main():
     ###File path names
     directory = "parkingtry"
@@ -24,7 +25,8 @@ def main():
 
     ##Request
     API_KEY = config.places_api_key
-    response = requests.get("https://maps.googleapis.com/maps/api/place/textsearch/json?query=Los+Angeles&type=parking&key=" + API_KEY)
+    response = requests.get(
+        "https://maps.googleapis.com/maps/api/place/textsearch/json?query=Los+Angeles&type=parking&key=" + API_KEY)
     results = response.json()
     results = results["results"]
 
@@ -35,7 +37,7 @@ def main():
     print(path)
 
     ##Write csv
-    data_file = open(os.path.join(path,csv_name + ".csv"), 'w', newline='')
+    data_file = open(os.path.join(path, csv_name + ".csv"), 'w', newline='')
     csv_writer = csv.writer(data_file)
     count = 0
     photos = []
@@ -43,11 +45,11 @@ def main():
     for i in results:
         if count == 0:
             # Writing headers of CSV file
-            header = ["Formatted Address", "Latitude", "Longitude", "Name", "Types" ]
+            header = ["Formatted Address", "Latitude", "Longitude", "Name", "Types"]
             csv_writer.writerow(header)
             count += 1
-        csv_writer.writerow([i["formatted_address"], i["geometry"]["location"]["lat"],i["geometry"]["location"]["lng"]
-                             , i["name"], i["types"]])
+        csv_writer.writerow([i["formatted_address"], i["geometry"]["location"]["lat"], i["geometry"]["location"]["lng"]
+                                , i["name"], i["types"]])
 
         print(i)
 
@@ -61,12 +63,14 @@ def main():
 
     ## Get photos
     for i in range(0, len(photos)):
-        photo = requests.get("https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" + photos[i] + "&key=" + API_KEY)
+        photo = requests.get("https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" + photos[
+            i] + "&key=" + API_KEY)
 
-        filename =  str(tracker[i])+ ".jpg"
+        filename = str(tracker[i]) + ".jpg"
         file = open(os.path.join(path, filename), "wb")
         file.write(photo.content)
         file.close()
+
 
 def elevationData():
     ##name files
@@ -96,7 +100,7 @@ def elevationData():
                 print(f'Column names are {", ".join(row)}')
                 line_count += 1
             else:
-                print(row[1], row[0],  row[4], row[7])
+                print(row[1], row[0], row[4], row[7])
                 processed_result.append(row[1])
                 processed_result.append(row[0])
                 processed_result.append(row[4])
@@ -104,7 +108,9 @@ def elevationData():
 
                 ## fetch photo data for search in format **address**, Los Angeles
                 address = row[7]
-                photores = requests.get("https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=" + str(row[4]) + "LosAngeles&inputtype=textquery&fields=photos&key=" + PLACES_API_KEY)
+                photores = requests.get(
+                    "https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=" + str(
+                        row[4]) + "LosAngeles&inputtype=textquery&fields=photos&key=" + PLACES_API_KEY)
                 photores = photores.json()
 
                 ##if entry has photo data, request for photo and write to directory, add "Yes" in
@@ -112,7 +118,8 @@ def elevationData():
                 try:
                     ref = photores["candidates"][0]['photos'][0]['photo_reference']
                     print("photores", photores["candidates"][0]['photos'][0]['photo_reference'])
-                    photo = requests.get("https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" + ref + "&key=" + PLACES_API_KEY)
+                    photo = requests.get(
+                        "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" + ref + "&key=" + PLACES_API_KEY)
                     filename = address + ".jpg"
                     file = open(os.path.join(path, filename), "wb")
                     file.write(photo.content)
@@ -125,7 +132,8 @@ def elevationData():
 
                 ##Get elevation data for entry by lat-long
                 response = requests.get(
-                    "https://maps.googleapis.com/maps/api/elevation/json?locations=" + str(row[1]) + "," + row[0] + "&key="
+                    "https://maps.googleapis.com/maps/api/elevation/json?locations=" + str(row[1]) + "," + row[
+                        0] + "&key="
                     + API_KEY)
                 results = response.json()
                 results = results["results"]
@@ -147,24 +155,27 @@ def elevationData():
         for i in processed_results:
             if count == 0:
                 # Writing headers of CSV file
-                header = [ "Latitude", "Longitude", "Name", "Formatted Address", "Elevation", "Photo"]
+                header = ["Latitude", "Longitude", "Name", "Formatted Address", "Elevation", "Photo"]
                 csv_writer.writerow(header)
                 count += 1
             csv_writer.writerow(
-                    [i[0], i[1], i[2]
-                        , i[3], i[5], i[4]])
+                [i[0], i[1], i[2]
+                    , i[3], i[5], i[4]])
+
+
 class Address:
     def __init__(self, address, lat, long, name):
         self.address = address
         self.lat = lat
         self.long = long
         self.name = name
+
+
 def webtry():
     csv_name = "pictry"
 
     ##create directory
     path = os.getcwd()
-
 
     addresses = []
     with open('citydata.csv') as csv_file:
@@ -176,11 +187,11 @@ def webtry():
                 line_count += 1
             else:
                 address = row[7] + ", CA"
-                addy = Address(address=address, lat= row[1], long = row[0], name = row[4])
+                addy = Address(address=address, lat=row[1], long=row[0], name=row[4])
                 addresses.append(addy)
     data_file = open(os.path.join(path, csv_name + ".csv"), 'w', newline='')
     csv_writer = csv.writer(data_file)
-    csv_writer.writerow(["Address","Lat", "Long", "Name", "Pic"])
+    csv_writer.writerow(["Address", "Lat", "Long", "Name", "Pic"])
     chrome_options = Options()
     maps = webdriver.Chrome(options=chrome_options)
     maps.maximize_window()
@@ -204,15 +215,14 @@ def webtry():
             pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
             src = pic.get_attribute('src')
             urllib.request.urlretrieve(src, addresses[i].address + ".png")
-            csv_writer.writerow([addresses[i].address,addresses[i].lat, addresses[i].long, addresses[i].name, addresses[i].address + ".png"])
+            csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name,
+                                 '=HYPERLINK("' + src + '" , "link")'])
+
         except:
-            csv_writer.writerow([addresses[i].address,addresses[i].lat, addresses[i].long, addresses[i].name])
+            csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name])
             pass
-
-
+    data_file.close()
     maps.close()
-
-
 
 
 def tallestBuilding():
@@ -224,7 +234,6 @@ def tallestBuilding():
     results = results["results"]
     print(results)
 
+
 if __name__ == '__main__':
     webtry()
-
-
