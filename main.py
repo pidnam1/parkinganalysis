@@ -1,9 +1,21 @@
 import requests
 import json
 import os
+
+import self as self
+
 import config
 import csv
-
+import time
+from urllib3 import PoolManager
+import urllib.request
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import Select
+import sys
+import time
+import logging
 
 def main():
     ###File path names
@@ -141,6 +153,66 @@ def elevationData():
             csv_writer.writerow(
                     [i[0], i[1], i[2]
                         , i[3], i[5], i[4]])
+class Address:
+    def __init__(self, address, lat, long, name):
+        self.address = address
+        self.lat = lat
+        self.long = long
+        self.name = name
+def webtry():
+    csv_name = "pictry"
+
+    ##create directory
+    path = os.getcwd()
+
+
+    addresses = []
+    with open('citydata.csv') as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        line_count = 0
+        for row in csv_reader:
+            if line_count == 0:
+                print(f'Column names are {", ".join(row)}')
+                line_count += 1
+            else:
+                address = row[7] + ", CA"
+                addy = Address(address=address, lat= row[1], long = row[0], name = row[4])
+                addresses.append(addy)
+    data_file = open(os.path.join(path, csv_name + ".csv"), 'w', newline='')
+    csv_writer = csv.writer(data_file)
+    csv_writer.writerow(["Address","Lat", "Long", "Name", "Pic"])
+    chrome_options = Options()
+    maps = webdriver.Chrome(options=chrome_options)
+    maps.maximize_window()
+    maps.get('https://www.google.com/maps/')
+    search_bar = maps.find_element_by_xpath("//*[@id='searchboxinput']")
+    search_bar.send_keys(addresses[0].address)
+    button = maps.find_element_by_id("searchbox-searchbutton")
+    button.click()
+    time.sleep(5)
+    pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
+    src = pic.get_attribute('src')
+    urllib.request.urlretrieve(src, addresses[0].address + ".png")
+    for i in range(1, len(addresses)):
+        search_bar.send_keys(Keys.CONTROL, 'a')
+        search_bar.send_keys(Keys.BACKSPACE)
+        time.sleep(.5)
+        search_bar.send_keys(addresses[i].address)
+        button.click()
+        time.sleep(2.5)
+        try:
+            pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
+            src = pic.get_attribute('src')
+            urllib.request.urlretrieve(src, addresses[i].address + ".png")
+            csv_writer.writerow([addresses[i].address,addresses[i].lat, addresses[i].long, addresses[i].name, addresses[i].address + ".png"])
+        except:
+            csv_writer.writerow([addresses[i].address,addresses[i].lat, addresses[i].long, addresses[i].name])
+            pass
+
+
+    maps.close()
+
+
 
 
 def tallestBuilding():
@@ -151,7 +223,8 @@ def tallestBuilding():
     results = response.json()
     results = results["results"]
     print(results)
+
 if __name__ == '__main__':
-    elevationData()
+    webtry()
 
 
