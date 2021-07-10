@@ -1,9 +1,8 @@
 import requests
 import json
 import os
-
+from csv import writer
 import self as self
-
 import config
 import csv
 import time
@@ -16,6 +15,7 @@ from selenium.webdriver.support.ui import Select
 import sys
 import time
 import logging
+import io
 
 '''
 Finds parking garages in Los Angeles and places that info in Excel file
@@ -179,10 +179,103 @@ class Address:
         self.long = long
         self.name = name
 
+'''Finds addresses, name, and lat long of relevant cities parking and prepares them for next function'''
+def multipleParking():
+    ##Request
+    API_KEY = config.places_api_key
+    formatted_addresses = []
+    cities = []
+    addy_arr = []
+    # Using readlines()
+    file1 = open('cities_list.txt', 'r')
+    lines = file1.readlines()
+
+    count = 0
+    # Strips the newline character
+    for line in lines:
+        print(line.strip())
+        cities.append(line.strip())
+    for i in cities:
+        response = requests.get(
+        "https://maps.googleapis.com/maps/api/place/textsearch/json?query=" + i + ",CA&type=parking&key=" + API_KEY)
+        results = response.json()
+        results = results["results"]
+        for i in results:
+            print(i["formatted_address"], i["geometry"]["location"]["lat"], i["geometry"]["location"]["lng"]
+        , i["name"], i["types"])
+            if i["formatted_address"] in formatted_addresses:
+                pass
+            else:
+                formatted_addresses.append(i["formatted_address"])
+                addy = Address(address= i["formatted_address"], lat = i["geometry"]["location"]["lat"], long = i["geometry"]["location"]["lng"], name = i["name"] )
+                addy_arr.append(addy)
+    print("----------------------------------")
+    print(len(addy_arr))
+    try:
+        with io.open('mapsgot.txt', 'w', encoding="utf-8") as f:
+            for i in addy_arr:
+                f.write(i.address)
+                f.write("\n")
+                f.write(str(i.lat))
+                f.write("\n")
+                f.write(str(i.long))
+                f.write("\n")
+                f.write(i.name)
+                f.write("\n")
+            f.close()
+        web_expand(addy_arr)
+    except:
+        web_expand(addy_arr)
 '''
 Creates excel file with related images from addresses searched on google maps
 Also downloads the images
  '''
+def web_expand(addresses):
+    with io.open('pictry.csv', 'a', encoding="utf-8") as f_object:
+        csv_writer = writer(f_object)
+    ##open google maps and write first address, search
+        chrome_options = Options()
+        maps = webdriver.Chrome(options=chrome_options)
+        maps.maximize_window()
+        maps.get('https://www.google.com/maps/')
+        search_bar = maps.find_element_by_xpath("//*[@id='searchboxinput']")
+        search_bar.send_keys(addresses[0].address)
+        button = maps.find_element_by_id("searchbox-searchbutton")
+        button.click()
+        time.sleep(6)
+
+        ##grab pic webelement and download from link
+        pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
+        src = pic.get_attribute('src')
+        urllib.request.urlretrieve(src, addresses[0].address + ".png")
+        csv_writer.writerow([addresses[0].address, addresses[0].lat, addresses[0].long, addresses[0].name,
+                                 '=HYPERLINK("' + src + '" , "link")'])
+        ##loop through rest of address objects
+        for i in range(1, len(addresses)):
+            search_bar.send_keys(Keys.CONTROL, 'a')
+            search_bar.send_keys(Keys.BACKSPACE)
+            time.sleep(.5)
+            search_bar.send_keys(addresses[i].address)
+            button.click()
+            time.sleep(2.5)
+
+            ## if no pic, still add other info in except block
+            try:
+                pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
+                src = pic.get_attribute('src')
+                urllib.request.urlretrieve(src, addresses[i].address + ".png")
+                csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name,
+                                 '=HYPERLINK("' + src + '" , "link")'])
+
+            except:
+                try:
+                    csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name])
+                except:
+                    pass
+
+        ##Close everything
+        f_object.close()
+        maps.close()
 def webtry():
     csv_name = "pictry"
 
@@ -263,4 +356,4 @@ def tallestBuilding():
 
 
 if __name__ == '__main__':
-    webtry()
+    multipleParking()
