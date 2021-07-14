@@ -230,6 +230,48 @@ def multipleParking():
 Creates excel file with related images from addresses searched on google maps
 Also downloads the images
  '''
+
+def nearby_try():
+    file1 = io.open('mapsgot.txt', 'r', encoding="utf-8")
+    lines = file1.readlines()
+    addresses = []
+    lats = []
+    longs = []
+    count = 0
+    # Strips the newline character
+
+    for line in lines:
+
+        if count % 4 == 0:
+            print ("Addy", line.strip())
+            addresses.append(line.strip())
+        if count % 4 == 1:
+            print("Lat", line.strip())
+            lats.append(line.strip())
+        if count % 4 == 2:
+            print("Long", line.strip())
+            longs.append(line.strip())
+
+        if count == 28:
+            break
+        count += 1
+
+
+    nearby_call(addresses,lats, longs)
+def nearby_call(addresses,lats, longs):
+    PLACES_API_KEY = config.places_api_key
+
+    for i, j in zip(lats,longs):
+
+        response = requests.get(
+            "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" + str(i) + "," + str(j) + "&radius=5000&type=parking&key=" + PLACES_API_KEY)
+        results = response.json()
+        print(results)
+        results = results["results"]
+        print("------------------")
+        print("Querying: -> ", i, j)
+        print(results)
+
 def web_expand(addresses):
     with io.open('pictry.csv', 'a', encoding="utf-8") as f_object:
         csv_writer = writer(f_object)
@@ -356,4 +398,4 @@ def tallestBuilding():
 
 
 if __name__ == '__main__':
-    multipleParking()
+    nearby_try()
