@@ -16,6 +16,7 @@ import sys
 import time
 import logging
 import io
+import pandas as pd
 
 '''
 Finds parking garages in Los Angeles and places that info in Excel file
@@ -234,14 +235,14 @@ Also downloads the images
 def nearby_try():
     file1 = io.open('mapsgot.txt', 'r', encoding="utf-8")
     lines = file1.readlines()
-    addresses = []
+    addresses=[]
     lats = []
     longs = []
     count = 0
     # Strips the newline character
 
-    for line in lines:
-
+    for line in lines[4024:]:
+        print("Working it:, ", line)
         if count % 4 == 0:
             print ("Addy", line.strip())
             addresses.append(line.strip())
@@ -252,25 +253,79 @@ def nearby_try():
             print("Long", line.strip())
             longs.append(line.strip())
 
-        if count == 28:
+        if count == 4432:
             break
         count += 1
 
 
-    nearby_call(addresses,lats, longs)
-def nearby_call(addresses,lats, longs):
+    sorted_by_distance(addresses, lats, longs)
+
+def sorted_by_distance(addresses,lats, longs):
+    print("By Distance: -------------")
     PLACES_API_KEY = config.places_api_key
+    cords = []
+    file = io.open('pictry.csv', 'r', encoding="utf-8")
+    df = pd.read_csv(file)
+    lati = df.Lat  # you can also use df['column_name']
+    longi = df.Long
+    print("testing", lati, longi)
+    for i, j in zip(lati, longi):
+        addy = Address(address="", lat= i, long= j, name="")
+        cords.append(addy)
 
-    for i, j in zip(lats,longs):
+    addresses = []
+    lat_check = []
+    results_addy = Address(address="", lat=0, long=0,
+                           name='')
 
-        response = requests.get(
-            "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" + str(i) + "," + str(j) + "&radius=5000&type=parking&key=" + PLACES_API_KEY)
-        results = response.json()
-        print(results)
-        results = results["results"]
-        print("------------------")
-        print("Querying: -> ", i, j)
-        print(results)
+    with io.open('distgot.txt', 'w', encoding="utf-8") as f:
+        for i, j in zip(lats, longs):
+            response = requests.get(
+                "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" + str(i) + "," + str(
+                    j) + "&rankby=distance&type=parking&key=" + PLACES_API_KEY)
+            full_results = response.json()
+            print(full_results)
+            try:
+                caught = full_results["next_page_token"]
+                print("Caught", caught)
+                time.sleep(1.75)
+                response_two = requests.get("https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=" + caught + "&key=" + PLACES_API_KEY)
+                results_two = response_two.json()
+                results_two = results_two['results']
+                print("Second, ", results_two)
+                for j in results_two:
+                    if j['geometry']['location']['lat'] not in lat_check:
+                        lat_check.append(j['geometry']['location']['lat'])
+                        addresses.append(Address(address = "", lat = j['geometry']['location']['lat'], long = j['geometry']['location']['lng'], name = ""))
+                try:
+                    time.sleep(1.75)
+                    caught = results_two["next_page_token"]
+                    response_three = requests.get(
+                        "https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=" + caught + "&key=" + PLACES_API_KEY)
+                    results_three = response_three.json()
+                    results_three = results_three['results']
+                    print("Third, " ,results_three)
+                except:
+                    pass
+
+            except:
+                pass
+            results = full_results["results"]
+
+            print("------------------")
+            print("Querying: -> ", i, j)
+            print(results)
+            for i in results:
+                f.write(i['name'])
+                f.write("\n")
+                print(i['geometry']['location']['lat'], i['geometry']['location']['lng'])
+                if i['geometry']['location']['lat'] not in lat_check:
+                    lat_check.append(i['geometry']['location']['lat'])
+                    addresses.append(Address(address = "", lat = i['geometry']['location']['lat'], long = i['geometry']['location']['lng'], name = ""))
+    print("checking something", len(addresses))
+    for i in addresses:
+        print('checker', i.lat, i.long)
+    web_expand(addresses)
 
 def web_expand(addresses):
     with io.open('pictry.csv', 'a', encoding="utf-8") as f_object:
@@ -281,7 +336,7 @@ def web_expand(addresses):
         maps.maximize_window()
         maps.get('https://www.google.com/maps/')
         search_bar = maps.find_element_by_xpath("//*[@id='searchboxinput']")
-        search_bar.send_keys(addresses[0].address)
+        search_bar.send_keys(str(addresses[0].lat) + "," + str(addresses[0].long))
         button = maps.find_element_by_id("searchbox-searchbutton")
         button.click()
         time.sleep(6)
@@ -290,28 +345,29 @@ def web_expand(addresses):
         pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
         src = pic.get_attribute('src')
         urllib.request.urlretrieve(src, addresses[0].address + ".png")
-        csv_writer.writerow([addresses[0].address, addresses[0].lat, addresses[0].long, addresses[0].name,
+        csv_writer.writerow(["", addresses[0].lat, addresses[0].long, addresses[0].name,
                                  '=HYPERLINK("' + src + '" , "link")'])
         ##loop through rest of address objects
         for i in range(1, len(addresses)):
             search_bar.send_keys(Keys.CONTROL, 'a')
             search_bar.send_keys(Keys.BACKSPACE)
-            time.sleep(.5)
-            search_bar.send_keys(addresses[i].address)
+            time.sleep(.1)
+            search_bar.send_keys(str(addresses[i].lat) + "," + str(addresses[i].long))
             button.click()
-            time.sleep(2.5)
+            time.sleep(3)
 
             ## if no pic, still add other info in except block
             try:
                 pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
                 src = pic.get_attribute('src')
-                urllib.request.urlretrieve(src, addresses[i].address + ".png")
-                csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name,
+                if src != "https://maps.gstatic.com/tactile/pane/default_geocode-2x.png":
+                    urllib.request.urlretrieve(src, str(addresses[i].lat) + "," + str(addresses[i].long) + ".png")
+                    csv_writer.writerow(["", addresses[i].lat, addresses[i].long, addresses[i].name,
                                  '=HYPERLINK("' + src + '" , "link")'])
 
             except:
                 try:
-                    csv_writer.writerow([addresses[i].address, addresses[i].lat, addresses[i].long, addresses[i].name])
+                    csv_writer.writerow(["", addresses[i].lat, addresses[i].long, addresses[i].name])
                 except:
                     pass
 
