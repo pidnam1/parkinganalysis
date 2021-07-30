@@ -174,7 +174,8 @@ Definition of Address class used in webscraper
 Makes code easier to read and debug
 '''
 class Address:
-    def __init__(self, address, lat, long, name):
+    def __init__(self, code, address, lat, long, name):
+        self.code = code
         self.address = address
         self.lat = lat
         self.long = long
@@ -238,51 +239,63 @@ def nearby_try():
     addresses=[]
     lats = []
     longs = []
+    codes = []
     count = 0
     # Strips the newline character
-
-    for line in lines[4024:]:
-        print("Working it:, ", line)
+    addy_arr = []
+    for line in lines[0:]:
         if count % 4 == 0:
-            print ("Addy", line.strip())
+            print ("ADDRESS: ", line.strip())
             addresses.append(line.strip())
+            if count >= 0 and count < 4025:
+                codes.append("L")
+            if count >= 4025 and count < 4437:
+                codes.append("V")
+            if count >= 4437:
+                codes.append("O")
+
         if count % 4 == 1:
-            print("Lat", line.strip())
+            print("LAT: ", line.strip())
             lats.append(line.strip())
         if count % 4 == 2:
-            print("Long", line.strip())
+            print("LONG: ", line.strip())
             longs.append(line.strip())
 
-        if count == 4432:
-            break
+        ##if count == 4432:
         count += 1
+    ##check that all arrays have same count, important
+    print("CHECKING CODES IS OK: ", codes)
+    print("SHOULD ALL BE THE SAME: ", len(codes), len(addresses), len(lats), len(longs))
+    for h, i, j, k in zip(codes, addresses, lats, longs):
+        addy = Address(code = h, address = i, lat = j, long = k, name = "")
+        addy_arr.append(addy)
+    sorted_by_distance(addy_arr)
 
-
-    sorted_by_distance(addresses, lats, longs)
-
-def sorted_by_distance(addresses,lats, longs):
+def sorted_by_distance(addy_arr):
+    city_counter = {"L": 0, "V": 0, "O": 0}
     print("By Distance: -------------")
     PLACES_API_KEY = config.places_api_key
     cords = []
     file = io.open('pictry.csv', 'r', encoding="utf-8")
     df = pd.read_csv(file)
-    lati = df.Lat  # you can also use df['column_name']
-    longi = df.Long
-    print("testing", lati, longi)
-    for i, j in zip(lati, longi):
-        addy = Address(address="", lat= i, long= j, name="")
+
+    ### adds previous cordinates to array so we can check for duplicates
+    for i in addy_arr:
+        addy = Address(code = i.code, address=i.address, lat= i.lat, long= i.long, name="")
         cords.append(addy)
 
-    addresses = []
+
+    ##define array for results of searches, can check in here to make sure we don't double count while we do the search
     lat_check = []
-    results_addy = Address(address="", lat=0, long=0,
-                           name='')
+
+    ##define array we will add found addresses to
+    addresses = []
 
     with io.open('distgot.txt', 'w', encoding="utf-8") as f:
-        for i, j in zip(lats, longs):
+        for i in addy_arr:
             response = requests.get(
-                "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" + str(i) + "," + str(
-                    j) + "&rankby=distance&type=parking&key=" + PLACES_API_KEY)
+                "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" + str(i.lat) + "," + str(
+                    i.long) + "&rankby=distance&type=parking&key=" + PLACES_API_KEY)
             full_results = response.json()
             print(full_results)
             try:
@@ -296,7 +309,8 @@ def sorted_by_distance(addresses,lats, longs):
                 for j in results_two:
                     if j['geometry']['location']['lat'] not in lat_check:
                         lat_check.append(j['geometry']['location']['lat'])
-                        addresses.append(Address(address = "", lat = j['geometry']['location']['lat'], long = j['geometry']['location']['lng'], name = ""))
+                        addresses.append(Address(code = i.code + str(city_counter[i.code]) , address = "", lat = j['geometry']['location']['lat'], long = j['geometry']['location']['lng'], name = ""))
+                        city_counter[i.code] += 1
                 try:
                     time.sleep(1.75)
                     caught = results_two["next_page_token"]
@@ -305,6 +319,12 @@ def sorted_by_distance(addresses,lats, longs):
                     results_three = response_three.json()
                     results_three = results_three['results']
                     print("Third, " ,results_three)
+                    for j in results_three:
+                        if j['geometry']['location']['lat'] not in lat_check:
+                            lat_check.append(j['geometry']['location']['lat'])
+                            addresses.append(Address(code=i.code + str(city_counter[i.code]), address="", lat=j['geometry']['location']['lat'],
+                                                     long=j['geometry']['location']['lng'], name=""))
+                            city_counter[i.code] += 1
                 except:
                     pass
 
@@ -313,23 +333,29 @@ def sorted_by_distance(addresses,lats, longs):
             results = full_results["results"]
 
             print("------------------")
-            print("Querying: -> ", i, j)
+            print("Querying: -> ", i.lat, i.long)
             print(results)
-            for i in results:
-                f.write(i['name'])
+
+            ##generate proper IDs
+
+
+            for j in results:
+                f.write(j['name'])
                 f.write("\n")
-                print(i['geometry']['location']['lat'], i['geometry']['location']['lng'])
-                if i['geometry']['location']['lat'] not in lat_check:
-                    lat_check.append(i['geometry']['location']['lat'])
-                    addresses.append(Address(address = "", lat = i['geometry']['location']['lat'], long = i['geometry']['location']['lng'], name = ""))
-    print("checking something", len(addresses))
-    for i in addresses:
-        print('checker', i.lat, i.long)
+                print( j['geometry']['location']['lat'], j['geometry']['location']['lng'])
+                if j['geometry']['location']['lat'] not in lat_check:
+                    lat_check.append(j['geometry']['location']['lat'])
+                    addresses.append(Address(code = i.code + str(city_counter[i.code]), address = "", lat = j['geometry']['location']['lat'], long = j['geometry']['location']['lng'], name = ""))
+                    city_counter[i.code] += 1
+    print("-------------------------------------")
+    print("# OF FOUND ADDRESSES", len(addresses))
+
     web_expand(addresses)
 
 def web_expand(addresses):
-    with io.open('pictry.csv', 'a', encoding="utf-8") as f_object:
+    with io.open('codealltry.csv', 'w', encoding="utf-8") as f_object:
         csv_writer = writer(f_object)
+        csv_writer.writerow(["ID", "Lat", "Long", "Name"])
     ##open google maps and write first address, search
         chrome_options = Options()
         maps = webdriver.Chrome(options=chrome_options)
@@ -344,8 +370,8 @@ def web_expand(addresses):
         ##grab pic webelement and download from link
         pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
         src = pic.get_attribute('src')
-        urllib.request.urlretrieve(src, addresses[0].address + ".png")
-        csv_writer.writerow(["", addresses[0].lat, addresses[0].long, addresses[0].name,
+        urllib.request.urlretrieve(src, addresses[0].code + ".png")
+        csv_writer.writerow([addresses[0].code, addresses[0].lat, addresses[0].long, addresses[0].name,
                                  '=HYPERLINK("' + src + '" , "link")'])
         ##loop through rest of address objects
         for i in range(1, len(addresses)):
@@ -360,14 +386,19 @@ def web_expand(addresses):
             try:
                 pic = maps.find_element_by_xpath("//*[@id='pane']/div/div[1]/div/div/div[1]/div[1]/button/img")
                 src = pic.get_attribute('src')
+
                 if src != "https://maps.gstatic.com/tactile/pane/default_geocode-2x.png":
-                    urllib.request.urlretrieve(src, str(addresses[i].lat) + "," + str(addresses[i].long) + ".png")
-                    csv_writer.writerow(["", addresses[i].lat, addresses[i].long, addresses[i].name,
-                                 '=HYPERLINK("' + src + '" , "link")'])
+                    urllib.request.urlretrieve(src, addresses[i].code + ".png")
+                    csv_writer.writerow([addresses[i].code, addresses[i].lat, addresses[i].long, addresses[i].name,
+                                         '=HYPERLINK("' + src + '" , "link")'])
+                else:
+                    csv_writer.writerow([addresses[i].code, addresses[i].lat, addresses[i].long, addresses[i].name,
+                                         "default"])
+
 
             except:
                 try:
-                    csv_writer.writerow(["", addresses[i].lat, addresses[i].long, addresses[i].name])
+                    csv_writer.writerow([addresses[i].code, addresses[i].lat, addresses[i].long, addresses[i].name])
                 except:
                     pass
 
